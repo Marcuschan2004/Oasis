@@ -1,4 +1,3 @@
-
 #include "Modulo.hpp"
 
 namespace Oasis {
@@ -7,27 +6,55 @@ Modulo<Expression, Expression>::Modulo(const Expression& dividend, const Express
     : BinaryExpression(dividend, divisor) {}
 
 auto Modulo<Expression, Expression>::Simplify() const -> std::unique_ptr<Expression> {
-    // Simplification logic for Modulo operation
-    // Placeholder implementation
-    return nullptr;
+    if (this->GetLeastSigOp().IsZero()) {
+        throw std::runtime_error("Division by zero in modulo operation.");
+    }
+
+    if (this->GetMostSigOp().IsZero()) {
+        return std::make_unique<Constant>(0);
+    }
+
+    if (this->GetLeastSigOp().IsOne()) {
+        return std::make_unique<Constant>(0);
+    }
+
+    return nullptr; // No further simplification possible
 }
 
 auto Modulo<Expression, Expression>::Simplify(tf::Subflow& subflow) const -> std::unique_ptr<Expression> {
-    // Parallel simplification logic for Modulo operation
-    // Placeholder implementation
-    return nullptr;
+    auto result = std::make_unique<Modulo>(*this);
+
+    subflow.emplace([&]() {
+        auto simplifiedDividend = this->GetMostSigOp().Simplify(subflow);
+        result->SetMostSigOp(*simplifiedDividend);
+    });
+
+    subflow.emplace([&]() {
+        auto simplifiedDivisor = this->GetLeastSigOp().Simplify(subflow);
+        result->SetLeastSigOp(*simplifiedDivisor);
+    });
+
+    subflow.join();
+
+    return result->Simplify(); // Simplify again after parallel tasks
 }
 
 auto Modulo<Expression, Expression>::Differentiate(const Expression& differentiationVariable) const -> std::unique_ptr<Expression> {
-    // Differentiation logic for Modulo operation
-    // Placeholder implementation
-    return nullptr;
+    auto u = this->GetMostSigOp();
+    auto v = this->GetLeastSigOp();
+    auto du = u.Differentiate(differentiationVariable);
+    auto dv = v.Differentiate(differentiationVariable);
+
+    auto quotient = std::make_unique<Divide>(u, v);
+    auto quotientDerivative = quotient->Differentiate(differentiationVariable);
+
+    auto result = std::make_unique<Subtract>(du, std::make_unique<Multiply>(dv, quotientDerivative));
+
+    return result;
 }
 
 auto Modulo<Expression, Expression>::Integrate(const Expression& integrationVariable) -> std::unique_ptr<Expression> {
-    // Integration logic for Modulo operation
-    // Placeholder implementation
-    return nullptr;
+    throw std::logic_error("Integration of modulo operation is not generally defined.");
 }
 
 auto Modulo<Expression, Expression>::Specialize(const Expression& other) -> std::unique_ptr<Modulo> {
